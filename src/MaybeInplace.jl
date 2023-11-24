@@ -12,20 +12,21 @@ __bangbang__docs = """
 The `@bangbang` macro rewrites expressions to use out-of-place operations if needed. The
 following operations are supported:
 
-    1. `copyto!(y, x)`
-    2. `x .(+/-/*)= <expr>`
-    3. `x ./= <expr>`
-    4. `copy(x)`
-    5. `x .= <expr>`
-    6. `@. <expr>`
+  1. `copyto!(y, x)`
+  2. `x .(+/-/*)= <expr>`
+  3. `x ./= <expr>`
+  4. `copy(x)`
+  5. `x .= <expr>`
+  6. `@. <expr>`
+  7. `x = copy(y)`
 
 This macro also allows some custom operators:
 
-    1. `×` (typed with `\\times<tab>`): This is effectively a matmul operator. It is
-       rewritten to use `mul!` if `y` can be setindex-ed else it is rewritten to use
-       `restructure` to create a new array. If there is a `vec` on the rhs, `vec` is also
-       applied to the lhs. This is useful for handling arbitrary dimensional arrays by
-       flattening them.
+  1. `×` (typed with `\\times<tab>`): This is effectively a matmul operator. It is
+      rewritten to use `mul!` if `y` can be setindex-ed else it is rewritten to use
+      `restructure` to create a new array. If there is a `vec` on the rhs, `vec` is also
+      applied to the lhs. This is useful for handling arbitrary dimensional arrays by
+      flattening them.
 
 !!! warning
 
@@ -46,10 +47,10 @@ my_non_generic_iip_oop(@SVector[0.0, 0.0], @SVector[1.0, 1.0]) # Fails
 ```
 
 Typically this will fail if `y` cannot be setindex-ed. However, this macro will rewrite
-the expression to use `copyto!` if the array supports `setindex!` (via ArrayInterface.jl)
+the expression to use `copyto!` if the array supports `setindex!` (via `ArrayInterface.jl`)
 else it will use `y = x`.
 
-```
+```julia
 function my_generic_iip_oop(y, x)
     @bb copyto!(y, x)
     return y
@@ -65,8 +66,8 @@ all operations on the list.
 
 !!! tip
 
-    For extensive use of this Package, see the source code for NonlinearSolve.jl and
-    SimpleNonlinearSolve.jl
+    For extensive use of this Package, see the source code for `NonlinearSolve.jl` and
+    `SimpleNonlinearSolve.jl`
 
 !!! warning
 
@@ -78,7 +79,7 @@ all operations on the list.
 ## Main Function
 function __bangbang__(M, expr; depth::Int = 1)
     new_expr = nothing
-    if @capture(expr, a_Symbol = copy(b_))
+    if @capture(expr, a_Symbol=copy(b_))
         new_expr = :($(a) = $(__copy)($(setindex_trait)($(b)), $(b)))
     elseif @capture(expr, f_(a_Symbol, args__))
         g = get(OP_MAPPING, f, nothing)
