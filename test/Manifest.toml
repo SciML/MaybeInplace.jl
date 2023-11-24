@@ -2,7 +2,7 @@
 
 julia_version = "1.10.0-rc1"
 manifest_format = "2.0"
-project_hash = "1f45826613cafa0faebd6512f3b1b9e3efe7eaaf"
+project_hash = "c31c70e376fb0af6b22375790fe5a79d2c770ae3"
 
 [[deps.Aqua]]
 deps = ["Compat", "Pkg", "Test"]
@@ -179,6 +179,11 @@ version = "3.5.9"
 [[deps.SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
 version = "0.7.0"
+
+[[deps.SafeTestsets]]
+git-tree-sha1 = "81ec49d645af090901120a1542e67ecbbe044db3"
+uuid = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
+version = "0.1.0"
 
 [[deps.Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"

@@ -1,14 +1,16 @@
-using MaybeInplace
-using Test
-using Aqua
-using JET
+using SafeTestsets, Test
 
 @testset "MaybeInplace.jl" begin
-    @testset "Code quality (Aqua.jl)" begin
-        Aqua.test_all(MaybeInplace; ambiguities = false,)
+    @safetestset "Code quality (Aqua.jl)" begin
+        using Aqua, MaybeInplace
+
+        Aqua.test_all(MaybeInplace; ambiguities = false)
     end
-    @testset "Code linting (JET.jl)" begin
+    @safetestset "Code linting (JET.jl)" begin
+        using JET, MaybeInplace
+
         JET.test_package(MaybeInplace; target_defined_modules = true)
     end
+
     # Write your tests here.
 end

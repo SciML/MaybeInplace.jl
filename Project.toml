@@ -1,7 +1,15 @@
 name = "MaybeInplace"
 uuid = "bb5d69b7-63fc-4a16-80bd-7e42200c7bdb"
 authors = ["Avik Pal <avikpal@mit.edu> and contributors"]
-version = "1.0.0-DEV"
+version = "0.1.0"
+
+[deps]
+ArrayInterface = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
 
 [compat]
+ArrayInterface = "7.6"
+LinearAlgebra = "<0.0.1, 1"
+MacroTools = "0.5"
 julia = "1.9"
