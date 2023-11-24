@@ -1,5 +1,4 @@
 style = "sciml"
-always_use_return = true
 format_docstrings = true
 format_markdown = true
 separate_kwargs_with_semicolon = true

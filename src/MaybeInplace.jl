@@ -106,7 +106,7 @@ function __bangbang__(M, expr; depth::Int = 1)
         depth == 1 && return esc(new_expr)
         return new_expr
     end
-    return error("`$(expr)` cannot be handled. Check the documentation for allowed expressions.")
+    error("`$(expr)` cannot be handled. Check the documentation for allowed expressions.")
 end
 
 ## Custom Operators
@@ -149,7 +149,15 @@ end
 function __handle_dot_op_equals_operators(M, expr, depth)
     op = nothing
     al, bl = nothing, nothing
-    @capture(expr, a_.=b_) && (op = __ignore_first; al = a; bl = b)
+    if @capture(expr, a_.=b_)
+        return quote
+            if $(setindex_trait)($(a)) === $(CanSetindex())
+                $(a) .= $(b)
+            else
+                $(a) = $(b)
+            end
+        end
+    end
     @capture(expr, a_.+=b_) && (op = :.+; al = a; bl = b)
     @capture(expr, a_.-=b_) && (op = :.-; al = a; bl = b)
     @capture(expr, a_.*=b_) && (op = :.*; al = a; bl = b)
@@ -157,7 +165,7 @@ function __handle_dot_op_equals_operators(M, expr, depth)
     if op !== nothing
         return quote
             if $(setindex_trait)($(al)) === $(CanSetindex())
-                @. $(expr)
+                $(al) .= $(op)($(al), $(bl))
             else
                 $(al) = $(op)($(al), $(bl))
             end
@@ -202,11 +210,8 @@ setindex_trait(A) = ifelse(can_setindex(A), CanSetindex(), CannotSetindex())
 @inline __copy(::CannotSetindex, x) = x
 @inline __copy(::CanSetindex, x) = copy(x)
 
-@inline __ignore_first(_, y) = y
-
-const OP_MAPPING = Dict{Symbol, Function}(:copyto! => __copyto!!,
-    :.-= => __sub!!, :.+= => __add!!, :.*= => __mul!!, :./= => __div!!,
-    :copy => __copy)
+const OP_MAPPING = Dict{Symbol, Function}(:copyto! => __copyto!!, :.-= => __sub!!,
+    :.+= => __add!!, :.*= => __mul!!, :./= => __div!!, :copy => __copy)
 
 ## Macros
 @doc __bangbang__docs
