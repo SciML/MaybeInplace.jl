@@ -191,6 +191,7 @@ struct CanSetindex <: AbstractMaybeSetindex end
 
 setindex_trait(::Number) = CannotSetindex()
 setindex_trait(::Array) = CanSetindex()
+setindex_trait(A::SubArray) = setindex_trait(parent(A))
 # In recent versions of Julia, this function has a type stable return type even without
 # overloading for sutom array types
 setindex_trait(A) = ifelse(can_setindex(A), CanSetindex(), CannotSetindex())
