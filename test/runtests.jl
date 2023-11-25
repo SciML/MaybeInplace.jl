@@ -12,5 +12,7 @@ using SafeTestsets, Test
         JET.test_package(MaybeInplace; target_defined_modules = true)
     end
 
-    # Write your tests here.
+    @safetestset "Core" begin
+        include("basictests.jl")
+    end
 end

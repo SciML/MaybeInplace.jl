@@ -189,6 +189,12 @@ abstract type AbstractMaybeSetindex end
 struct CannotSetindex <: AbstractMaybeSetindex end
 struct CanSetindex <: AbstractMaybeSetindex end
 
+"""
+    setindex_trait(A)
+
+Returns `CanSetindex()` if `A` can be setindex-ed else returns `CannotSetindex()`. This is
+used by `@bangbang` to determine if an array can be setindex-ed or not.
+"""
 setindex_trait(::Number) = CannotSetindex()
 setindex_trait(::Array) = CanSetindex()
 setindex_trait(A::SubArray) = setindex_trait(parent(A))
