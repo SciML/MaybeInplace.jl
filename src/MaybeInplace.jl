@@ -19,6 +19,7 @@ following operations are supported:
   5. `x .= <expr>`
   6. `@. <expr>`
   7. `x = copy(y)`
+  8. `axpy!(a, x, y)`
 
 This macro also allows some custom operators:
 
@@ -77,11 +78,31 @@ all operations on the list.
 """
 
 ## Main Function
+function __bangbang__(M, iip::Symbol, expr)
+    new_expr = nothing
+    if @capture(expr, f_(a_, args__))
+        new_expr = quote
+            if $(iip)
+                $(expr)
+            else
+                $(a) = $(f)($(a), $(args...))
+            end
+        end
+    end
+    if new_expr !== nothing
+        return esc(new_expr)
+    end
+    error("`$(iip) $(expr)` cannot be handled. Check the documentation for allowed \
+           expressions.")
+end
+
 function __bangbang__(M, expr; depth::Int = 1)
     new_expr = nothing
-    if @capture(expr, a_Symbol=copy(b_))
+    if @capture(expr, a_=copy(b_))
         new_expr = :($(a) = $(__copy)($(setindex_trait)($(b)), $(b)))
-    elseif @capture(expr, f_(a_Symbol, args__))
+    elseif @capture(expr, axpy!(α_, x_, y_))
+        new_expr = __handle_axpy(M, α, x, y, depth)
+    elseif @capture(expr, f_(a_, args__))
         g = get(OP_MAPPING, f, nothing)
         if g !== nothing
             new_expr = :($(a) = $(g)($(setindex_trait)($(a)), $(a), $(args...)))
@@ -184,6 +205,16 @@ function __handle_dot_macro(M, a, f, depth)
     end
 end
 
+function __handle_axpy(M, α, x, y, depth)
+    return quote
+        if $(setindex_trait)($(y)) === $(CanSetindex())
+            $(__safe_axpy!)($(α), $(x), $(y))
+        else
+            $(y) = @. $(α) * $(x) + $(y)
+        end
+    end
+end
+
 ## Traits
 abstract type AbstractMaybeSetindex end
 struct CannotSetindex <: AbstractMaybeSetindex end
@@ -220,20 +251,24 @@ setindex_trait(A) = ifelse(can_setindex(A), CanSetindex(), CannotSetindex())
 const OP_MAPPING = Dict{Symbol, Function}(:copyto! => __copyto!!, :.-= => __sub!!,
     :.+= => __add!!, :.*= => __mul!!, :./= => __div!!, :copy => __copy)
 
+@inline @generated function __safe_axpy!(α, x, y)
+    hasmethod(axpy!, Tuple{typeof(α), typeof(x), typeof(y)}) || return :(axpy!(α, x, y))
+    return :(@. y += α * x)
+end
+
 ## Macros
-@doc __bangbang__docs
-macro bangbang(expr)
-    return __bangbang__(__module__, expr)
-end
+for m in (:bangbang, :bb, :❗)
+    @eval begin
+        @doc __bangbang__docs
+        macro $m(expr)
+            return __bangbang__(__module__, expr)
+        end
 
-@doc __bangbang__docs
-macro bb(expr)
-    return __bangbang__(__module__, expr)
-end
-
-@doc __bangbang__docs
-macro ❗(expr)
-    return __bangbang__(__module__, expr)
+        @doc __bangbang__docs
+        macro $m(iip::Symbol, expr)
+            return __bangbang__(__module__, iip, expr)
+        end
+    end
 end
 
 @inline _vec(v) = v
