@@ -1,7 +1,8 @@
 module MaybeInplace
 
-using LinearAlgebra, MacroTools
+using LinearAlgebra, MacroTools, SparseArrays
 import ArrayInterface: can_setindex, restructure
+import SparseArrays: AbstractSparseArray
 
 ## Documentation
 __bangbang__docs = """
@@ -145,7 +146,7 @@ function __handle_custom_operator(op::Union{Val{:times}, Val{:plustimes}}, M, ex
         return quote
             if $(setindex_trait)($(a)) === $(CanSetindex())
                 $(a_sym) = $(a)
-                $(mul!)($(a_sym), $(_vec)($b), $(c))
+                $(__mul!)($(a_sym), $(_vec)($b), $(c))
                 $(a) = $(_restructure)($(a), $(a_sym))
             else
                 $(a) = $(_restructure)($a, $(_vec)($b) * $(c))
@@ -155,7 +156,7 @@ function __handle_custom_operator(op::Union{Val{:times}, Val{:plustimes}}, M, ex
         return quote
             if $(setindex_trait)($(a)) === $(CanSetindex())
                 $(a_sym) = $(a)
-                $(mul!)($(a_sym), $(_vec)($b), $(c), true, true)
+                $(__mul!)($(a_sym), $(_vec)($b), $(c), true, true)
                 $(a) = $(_restructure)($(a), $(a_sym))
             else
                 $(a) = $(a) .+ $(_restructure)($a, $(_vec)($b) * $(c))
@@ -165,7 +166,7 @@ function __handle_custom_operator(op::Union{Val{:times}, Val{:plustimes}}, M, ex
         return quote
             if $(setindex_trait)($(a)) === $(CanSetindex())
                 $(a_sym) = $(_vec)($a)
-                $(mul!)($(a_sym), $(b), $(_vec)($c))
+                $(__mul!)($(a_sym), $(b), $(_vec)($c))
                 $(a) = $(_restructure)($(a), $(a_sym))
             else
                 $(a) = $(_restructure)($a, $(b) * $(_vec)($c))
@@ -175,7 +176,7 @@ function __handle_custom_operator(op::Union{Val{:times}, Val{:plustimes}}, M, ex
         return quote
             if $(setindex_trait)($(a)) === $(CanSetindex())
                 $(a_sym) = $(_vec)($a)
-                $(mul!)($(a_sym), $(b), $(_vec)($c), true, true)
+                $(__mul!)($(a_sym), $(b), $(_vec)($c), true, true)
                 $(a) = $(_restructure)($(a), $(a_sym))
             else
                 $(a) = $(a) .+ $(_restructure)($a, $(b) * $(_vec)($c))
@@ -184,7 +185,7 @@ function __handle_custom_operator(op::Union{Val{:times}, Val{:plustimes}}, M, ex
     elseif @capture(expr, a_=×(b_, c_))
         return quote
             if $(setindex_trait)($(a)) === $(CanSetindex())
-                $(mul!)($(a), $(b), $(c))
+                $(__mul!)($(a), $(b), $(c))
             else
                 $(a) = $(_restructure)($a, $(b) * ($c))
             end
@@ -192,7 +193,7 @@ function __handle_custom_operator(op::Union{Val{:times}, Val{:plustimes}}, M, ex
     elseif @capture(expr, a_+=×(b_, c_))
         return quote
             if $(setindex_trait)($(a)) === $(CanSetindex())
-                $(mul!)($(a), $(b), $(c), true, true)
+                $(__mul!)($(a), $(b), $(c), true, true)
             else
                 $(a) = $(a) .+ $(_restructure)($a, $(b) * ($c))
             end
@@ -292,6 +293,13 @@ const OP_MAPPING = Dict{Symbol, Function}(:copyto! => __copyto!!, :.-= => __sub!
     hasmethod(axpy!, Tuple{typeof(α), typeof(x), typeof(y)}) || return :(axpy!(α, x, y))
     return :(@. y += α * x)
 end
+
+# Sparse Arrays `mul!` has really bad performance
+# This works around it, and also potentially allows dispatching for other array types
+__mul!(C, A, B) = mul!(C, A, B)
+__mul!(C::AbstractSparseArray, A, B) = (C .= A * B)
+__mul!(C, A, B, α, β) = mul!(C, A, B, α, β)
+__mul!(C::AbstractSparseArray, A, B, α, β) = (C .= α * A * B .+ β * C)
 
 ## Macros
 for m in (:bangbang, :bb, :❗)
