@@ -1,7 +1,8 @@
 module MaybeInplace
 
-using LinearAlgebra, MacroTools
+using LinearAlgebra, MacroTools, SparseArrays
 import ArrayInterface: can_setindex, restructure
+import SparseArrays: AbstractSparseArray
 
 ## Documentation
 __bangbang__docs = """
@@ -15,10 +16,12 @@ following operations are supported:
   1. `copyto!(y, x)`
   2. `x .(+/-/*)= <expr>`
   3. `x ./= <expr>`
-  4. `copy(x)`
+  4. `x = copy(y)`
   5. `x .= <expr>`
   6. `@. <expr>`
   7. `x = copy(y)`
+  8. `axpy!(a, x, y)`
+  9. `x = similar(y)`
 
 This macro also allows some custom operators:
 
@@ -77,11 +80,35 @@ all operations on the list.
 """
 
 ## Main Function
+function __bangbang__(M, iip::Symbol, expr)
+    new_expr = nothing
+    if @capture(expr, f_(a_, args__))
+        new_expr = quote
+            if $(iip)
+                $(expr)
+            else
+                $(a) = $(f)($(a), $(args...))
+            end
+        end
+    end
+    if new_expr !== nothing
+        return esc(new_expr)
+    end
+    error("`$(iip) $(expr)` cannot be handled. Check the documentation for allowed \
+           expressions.")
+end
+
 function __bangbang__(M, expr; depth::Int = 1)
     new_expr = nothing
-    if @capture(expr, a_Symbol=copy(b_))
+    if @capture(expr, a_=copy(b_))
         new_expr = :($(a) = $(__copy)($(setindex_trait)($(b)), $(b)))
-    elseif @capture(expr, f_(a_Symbol, args__))
+    elseif @capture(expr, a_=zero(b_))
+        new_expr = :($(a) = $(__zero)($(setindex_trait)($(b)), $(b)))
+    elseif @capture(expr, a_=similar(b_))
+        new_expr = :($(a) = $(__similar)($(setindex_trait)($(b)), $(b)))
+    elseif @capture(expr, axpy!(α_, x_, y_))
+        new_expr = __handle_axpy(M, α, x, y, depth)
+    elseif @capture(expr, f_(a_, args__))
         g = get(OP_MAPPING, f, nothing)
         if g !== nothing
             new_expr = :($(a) = $(g)($(setindex_trait)($(a)), $(a), $(args...)))
@@ -91,10 +118,12 @@ function __bangbang__(M, expr; depth::Int = 1)
         if g !== nothing
             new_expr = :($(a) = $(g)($(setindex_trait)($(a)), $(a), $(b), $(args...)))
         elseif f == :×
-            new_expr = __handle_custom_operator(Val{:×}(), M, expr, depth)
+            new_expr = __handle_custom_operator(Val{:times}(), M, expr, depth)
         end
     elseif @capture(expr, @. a_ = f_)
         new_expr = __handle_dot_macro(M, a, f, depth)
+    elseif @capture(expr, a_+=×(b_, c_))
+        new_expr = __handle_custom_operator(Val{:plustimes}(), M, expr, depth)
     elseif expr.head == :macrocall
         new_expr = __bangbang__(M, Base.macroexpand(M, expr; recursive = true);
             depth = depth + 1)
@@ -110,36 +139,65 @@ function __bangbang__(M, expr; depth::Int = 1)
 end
 
 ## Custom Operators
-function __handle_custom_operator(::Val{:×}, M, expr, depth)
-    @capture(expr, a_=×(b_, c_)) || error("Expected `a = b × c` got `$(expr)`")
+function __handle_custom_operator(op::Union{Val{:times}, Val{:plustimes}}, M, expr, depth)
+    @capture(expr, a_=×(b_, c_)) || @capture(expr, a_+=×(b_, c_)) ||
+        error("Expected `a = b × c` got `$(expr)`")
     @capture(expr, a_=×(vec(b_), vec(c_))) && return nothing
     a_sym = gensym("a")
     if @capture(expr, a_=×(vec(b_), c_))
         return quote
             if $(setindex_trait)($(a)) === $(CanSetindex())
-                $(a_sym) = $(_vec)($a)
-                $(mul!)($(a_sym), $(_vec)($b), $(c))
+                $(a_sym) = $(a)
+                $(__mul!)($(a_sym), $(_vec)($b), $(c))
                 $(a) = $(_restructure)($(a), $(a_sym))
             else
                 $(a) = $(_restructure)($a, $(_vec)($b) * $(c))
+            end
+        end
+    elseif @capture(expr, a_+=×(vec(b_), c_))
+        return quote
+            if $(setindex_trait)($(a)) === $(CanSetindex())
+                $(a_sym) = $(a)
+                $(__mul!)($(a_sym), $(_vec)($b), $(c), true, true)
+                $(a) = $(_restructure)($(a), $(a_sym))
+            else
+                $(a) = $(a) .+ $(_restructure)($a, $(_vec)($b) * $(c))
             end
         end
     elseif @capture(expr, a_=×(b_, vec(c_)))
         return quote
             if $(setindex_trait)($(a)) === $(CanSetindex())
                 $(a_sym) = $(_vec)($a)
-                $(mul!)($(a_sym), $(b), $(_vec)($c))
+                $(__mul!)($(a_sym), $(b), $(_vec)($c))
                 $(a) = $(_restructure)($(a), $(a_sym))
             else
                 $(a) = $(_restructure)($a, $(b) * $(_vec)($c))
             end
         end
+    elseif @capture(expr, a_+=×(b_, vec(c_)))
+        return quote
+            if $(setindex_trait)($(a)) === $(CanSetindex())
+                $(a_sym) = $(_vec)($a)
+                $(__mul!)($(a_sym), $(b), $(_vec)($c), true, true)
+                $(a) = $(_restructure)($(a), $(a_sym))
+            else
+                $(a) = $(a) .+ $(_restructure)($a, $(b) * $(_vec)($c))
+            end
+        end
     elseif @capture(expr, a_=×(b_, c_))
         return quote
             if $(setindex_trait)($(a)) === $(CanSetindex())
-                $(mul!)($(a), $(b), $(c))
+                $(__mul!)($(a), $(b), $(c))
             else
                 $(a) = $(_restructure)($a, $(b) * ($c))
+            end
+        end
+    elseif @capture(expr, a_+=×(b_, c_))
+        return quote
+            if $(setindex_trait)($(a)) === $(CanSetindex())
+                $(__mul!)($(a), $(b), $(c), true, true)
+            else
+                $(a) = $(a) .+ $(_restructure)($a, $(b) * ($c))
             end
         end
     end
@@ -184,6 +242,16 @@ function __handle_dot_macro(M, a, f, depth)
     end
 end
 
+function __handle_axpy(M, α, x, y, depth)
+    return quote
+        if $(setindex_trait)($(y)) === $(CanSetindex())
+            $(__safe_axpy!)($(α), $(x), $(y))
+        else
+            $(y) = @. $(α) * $(x) + $(y)
+        end
+    end
+end
+
 ## Traits
 abstract type AbstractMaybeSetindex end
 struct CannotSetindex <: AbstractMaybeSetindex end
@@ -195,12 +263,12 @@ struct CanSetindex <: AbstractMaybeSetindex end
 Returns `CanSetindex()` if `A` can be setindex-ed else returns `CannotSetindex()`. This is
 used by `@bangbang` to determine if an array can be setindex-ed or not.
 """
-setindex_trait(::Number) = CannotSetindex()
-setindex_trait(::Array) = CanSetindex()
-setindex_trait(A::SubArray) = setindex_trait(parent(A))
+@inline setindex_trait(::Number) = CannotSetindex()
+@inline setindex_trait(::Array) = CanSetindex()
+@inline setindex_trait(A::SubArray) = setindex_trait(parent(A))
 # In recent versions of Julia, this function has a type stable return type even without
 # overloading for sutom array types
-setindex_trait(A) = ifelse(can_setindex(A), CanSetindex(), CannotSetindex())
+@inline setindex_trait(A) = ifelse(can_setindex(A), CanSetindex(), CannotSetindex())
 
 ## Operations
 @inline __copyto!!(::CannotSetindex, x, y) = y
@@ -217,23 +285,40 @@ setindex_trait(A) = ifelse(can_setindex(A), CanSetindex(), CannotSetindex())
 @inline __copy(::CannotSetindex, x) = x
 @inline __copy(::CanSetindex, x) = copy(x)
 
+@inline __zero(::CannotSetindex, x) = x
+@inline __zero(::CanSetindex, x) = zero(x)
+
+@inline __similar(::CannotSetindex, x) = x
+@inline __similar(::CanSetindex, x) = similar(x)
+
 const OP_MAPPING = Dict{Symbol, Function}(:copyto! => __copyto!!, :.-= => __sub!!,
     :.+= => __add!!, :.*= => __mul!!, :./= => __div!!, :copy => __copy)
 
+@inline @generated function __safe_axpy!(α, x, y)
+    hasmethod(axpy!, Tuple{typeof(α), typeof(x), typeof(y)}) || return :(axpy!(α, x, y))
+    return :(@. y += α * x)
+end
+
+# Sparse Arrays `mul!` has really bad performance
+# This works around it, and also potentially allows dispatching for other array types
+__mul!(C, A, B) = mul!(C, A, B)
+__mul!(C::AbstractSparseArray, A, B) = (C .= A * B)
+__mul!(C, A, B, α, β) = mul!(C, A, B, α, β)
+__mul!(C::AbstractSparseArray, A, B, α, β) = (C .= α * A * B .+ β * C)
+
 ## Macros
-@doc __bangbang__docs
-macro bangbang(expr)
-    return __bangbang__(__module__, expr)
-end
+for m in (:bangbang, :bb, :❗)
+    @eval begin
+        @doc __bangbang__docs
+        macro $m(expr)
+            return __bangbang__(__module__, expr)
+        end
 
-@doc __bangbang__docs
-macro bb(expr)
-    return __bangbang__(__module__, expr)
-end
-
-@doc __bangbang__docs
-macro ❗(expr)
-    return __bangbang__(__module__, expr)
+        @doc __bangbang__docs
+        macro $m(iip::Symbol, expr)
+            return __bangbang__(__module__, iip, expr)
+        end
+    end
 end
 
 @inline _vec(v) = v
