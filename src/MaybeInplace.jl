@@ -102,6 +102,8 @@ function __bangbang__(M, expr; depth::Int = 1)
     new_expr = nothing
     if @capture(expr, a_=copy(b_))
         new_expr = :($(a) = $(__copy)($(setindex_trait)($(b)), $(b)))
+    elseif @capture(expr, a_=zero(b_))
+        new_expr = :($(a) = $(__zero)($(setindex_trait)($(b)), $(b)))
     elseif @capture(expr, a_=similar(b_))
         new_expr = :($(a) = $(__similar)($(setindex_trait)($(b)), $(b)))
     elseif @capture(expr, axpy!(α_, x_, y_))
@@ -282,6 +284,9 @@ used by `@bangbang` to determine if an array can be setindex-ed or not.
 
 @inline __copy(::CannotSetindex, x) = x
 @inline __copy(::CanSetindex, x) = copy(x)
+
+@inline __zero(::CannotSetindex, x) = x
+@inline __zero(::CanSetindex, x) = zero(x)
 
 @inline __similar(::CannotSetindex, x) = x
 @inline __similar(::CanSetindex, x) = similar(x)
