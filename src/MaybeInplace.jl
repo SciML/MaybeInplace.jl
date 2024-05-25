@@ -290,6 +290,11 @@ used by `@bangbang` to determine if an array can be setindex-ed or not.
 
 @inline __similar(::CannotSetindex, x) = x
 @inline __similar(::CanSetindex, x) = similar(x)
+@inline function __similar(::CanSetindex, x::AbstractArray{<:BigFloat})
+    y = similar(x)
+    fill!(y, zero(eltype(y)))
+    return y
+end
 
 const OP_MAPPING = Dict{Symbol, Function}(:copyto! => __copyto!!, :.-= => __sub!!,
     :.+= => __add!!, :.*= => __mul!!, :./= => __div!!, :copy => __copy)

@@ -24,6 +24,11 @@ function matmul!!(y, x, z)
     return y
 end
 
+function get_similar(x)
+    @bb z = similar(x)
+    return z
+end
+
 @testset "copyto!" begin
     x = [1.0, 1.0]
     y = [0.0, 0.0]
@@ -87,4 +92,16 @@ end
     z = @SVector[1.0, 1.0]
     @test matmul!!(y, x, z) == @SVector[2.0, 2.0]
     @test y == @SVector[0.0, 0.0]
+end
+
+@testset "similar" begin
+    x = [1.0, 1.0]
+    z = get_similar(x)
+
+    @test_nowarn z[1]
+
+    x = BigFloat[1.0, 1.0]
+    z = get_similar(x)
+
+    @test_nowarn z[1]  # Without correct similar this would throw UndefRefError
 end
