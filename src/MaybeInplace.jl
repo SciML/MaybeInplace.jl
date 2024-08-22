@@ -1,8 +1,8 @@
 module MaybeInplace
 
-using LinearAlgebra, MacroTools, SparseArrays
-import ArrayInterface: can_setindex, restructure
-import SparseArrays: AbstractSparseArray
+using LinearAlgebra: LinearAlgebra, axpy!, mul!
+using MacroTools: MacroTools, @capture
+using ArrayInterface: can_setindex, restructure
 
 ## Documentation
 __bangbang__docs = """
@@ -304,12 +304,8 @@ const OP_MAPPING = Dict{Symbol, Function}(:copyto! => __copyto!!, :.-= => __sub!
     return :(@. y += α * x)
 end
 
-# Sparse Arrays `mul!` has really bad performance
-# This works around it, and also potentially allows dispatching for other array types
 __mul!(C, A, B) = mul!(C, A, B)
-__mul!(C::AbstractSparseArray, A, B) = (C .= A * B)
 __mul!(C, A, B, α, β) = mul!(C, A, B, α, β)
-__mul!(C::AbstractSparseArray, A, B, α, β) = (C .= α * A * B .+ β * C)
 
 ## Macros
 for m in (:bangbang, :bb, :❗)

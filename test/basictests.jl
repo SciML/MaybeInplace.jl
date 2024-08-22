@@ -1,4 +1,4 @@
-using MaybeInplace, StaticArrays, Test
+using MaybeInplace, StaticArrays, Test, SparseArrays
 
 function copyto!!(y, x)
     @bb copyto!(y, x)
@@ -92,6 +92,11 @@ end
     z = @SVector[1.0, 1.0]
     @test matmul!!(y, x, z) == @SVector[2.0, 2.0]
     @test y == @SVector[0.0, 0.0]
+
+    x = sprand(100, 100, 0.01)
+    z = sprand(100, 100, 0.01)
+    y = x * z
+    @test matmul!!(y, x, z) == x * z
 end
 
 @testset "similar" begin
