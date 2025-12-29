@@ -266,6 +266,11 @@ used by `@bangbang` to determine if an array can be setindex-ed or not.
 @inline setindex_trait(::Number) = CannotSetindex()
 @inline setindex_trait(::Array) = CanSetindex()
 @inline setindex_trait(A::SubArray) = setindex_trait(parent(A))
+# LinearAlgebra wrapper types: delegate to parent
+@inline setindex_trait(A::LinearAlgebra.Symmetric) = setindex_trait(parent(A))
+@inline setindex_trait(A::LinearAlgebra.Hermitian) = setindex_trait(parent(A))
+@inline setindex_trait(A::LinearAlgebra.AbstractTriangular) = setindex_trait(parent(A))
+@inline setindex_trait(A::LinearAlgebra.Diagonal) = setindex_trait(parent(A))
 # In recent versions of Julia, this function has a type stable return type even without
 # overloading for sutom array types
 @inline setindex_trait(A) = ifelse(can_setindex(A), CanSetindex(), CannotSetindex())
