@@ -267,7 +267,7 @@ used by `@bangbang` to determine if an array can be setindex-ed or not.
 @inline setindex_trait(::Array) = CanSetindex()
 @inline setindex_trait(A::SubArray) = setindex_trait(parent(A))
 # In recent versions of Julia, this function has a type stable return type even without
-# overloading for sutom array types
+# overloading for custom array types
 @inline setindex_trait(A) = ifelse(can_setindex(A), CanSetindex(), CannotSetindex())
 
 ## Operations
