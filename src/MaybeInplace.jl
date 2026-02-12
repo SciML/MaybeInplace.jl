@@ -100,11 +100,11 @@ end
 
 function __bangbang__(M, expr; depth::Int = 1)
     new_expr = nothing
-    if @capture(expr, a_=copy(b_))
+    if @capture(expr, a_ = copy(b_))
         new_expr = :($(a) = $(__copy)($(setindex_trait)($(b)), $(b)))
-    elseif @capture(expr, a_=zero(b_))
+    elseif @capture(expr, a_ = zero(b_))
         new_expr = :($(a) = $(__zero)($(setindex_trait)($(b)), $(b)))
-    elseif @capture(expr, a_=similar(b_))
+    elseif @capture(expr, a_ = similar(b_))
         new_expr = :($(a) = $(__similar)($(setindex_trait)($(b)), $(b)))
     elseif @capture(expr, axpy!(α_, x_, y_))
         new_expr = __handle_axpy(M, α, x, y, depth)
@@ -113,7 +113,7 @@ function __bangbang__(M, expr; depth::Int = 1)
         if g !== nothing
             new_expr = :($(a) = $(g)($(setindex_trait)($(a)), $(a), $(args...)))
         end
-    elseif @capture(expr, a_=f_Symbol(b_, args__))
+    elseif @capture(expr, a_ = f_Symbol(b_, args__))
         g = get(OP_MAPPING, f, nothing)
         if g !== nothing
             new_expr = :($(a) = $(g)($(setindex_trait)($(a)), $(a), $(b), $(args...)))
@@ -122,11 +122,13 @@ function __bangbang__(M, expr; depth::Int = 1)
         end
     elseif @capture(expr, @. a_ = f_)
         new_expr = __handle_dot_macro(M, a, f, depth)
-    elseif @capture(expr, a_+=×(b_, c_))
+    elseif @capture(expr, a_ += ×(b_, c_))
         new_expr = __handle_custom_operator(Val{:plustimes}(), M, expr, depth)
     elseif expr.head == :macrocall
-        new_expr = __bangbang__(M, Base.macroexpand(M, expr; recursive = true);
-            depth = depth + 1)
+        new_expr = __bangbang__(
+            M, Base.macroexpand(M, expr; recursive = true);
+            depth = depth + 1
+        )
     else
         new_expr = __handle_dot_op_equals_operators(M, expr, depth)
     end
@@ -140,11 +142,11 @@ end
 
 ## Custom Operators
 function __handle_custom_operator(op::Union{Val{:times}, Val{:plustimes}}, M, expr, depth)
-    @capture(expr, a_=×(b_, c_)) || @capture(expr, a_+=×(b_, c_)) ||
+    @capture(expr, a_ = ×(b_, c_)) || @capture(expr, a_ += ×(b_, c_)) ||
         error("Expected `a = b × c` got `$(expr)`")
-    @capture(expr, a_=×(vec(b_), vec(c_))) && return nothing
+    @capture(expr, a_ = ×(vec(b_), vec(c_))) && return nothing
     a_sym = gensym("a")
-    if @capture(expr, a_=×(vec(b_), c_))
+    if @capture(expr, a_ = ×(vec(b_), c_))
         return quote
             if $(setindex_trait)($(a)) === $(CanSetindex())
                 $(a_sym) = $(a)
@@ -154,7 +156,7 @@ function __handle_custom_operator(op::Union{Val{:times}, Val{:plustimes}}, M, ex
                 $(a) = $(_restructure)($a, $(_vec)($b) * $(c))
             end
         end
-    elseif @capture(expr, a_+=×(vec(b_), c_))
+    elseif @capture(expr, a_ += ×(vec(b_), c_))
         return quote
             if $(setindex_trait)($(a)) === $(CanSetindex())
                 $(a_sym) = $(a)
@@ -164,7 +166,7 @@ function __handle_custom_operator(op::Union{Val{:times}, Val{:plustimes}}, M, ex
                 $(a) = $(a) .+ $(_restructure)($a, $(_vec)($b) * $(c))
             end
         end
-    elseif @capture(expr, a_=×(b_, vec(c_)))
+    elseif @capture(expr, a_ = ×(b_, vec(c_)))
         return quote
             if $(setindex_trait)($(a)) === $(CanSetindex())
                 $(a_sym) = $(_vec)($a)
@@ -174,7 +176,7 @@ function __handle_custom_operator(op::Union{Val{:times}, Val{:plustimes}}, M, ex
                 $(a) = $(_restructure)($a, $(b) * $(_vec)($c))
             end
         end
-    elseif @capture(expr, a_+=×(b_, vec(c_)))
+    elseif @capture(expr, a_ += ×(b_, vec(c_)))
         return quote
             if $(setindex_trait)($(a)) === $(CanSetindex())
                 $(a_sym) = $(_vec)($a)
@@ -184,7 +186,7 @@ function __handle_custom_operator(op::Union{Val{:times}, Val{:plustimes}}, M, ex
                 $(a) = $(a) .+ $(_restructure)($a, $(b) * $(_vec)($c))
             end
         end
-    elseif @capture(expr, a_=×(b_, c_))
+    elseif @capture(expr, a_ = ×(b_, c_))
         return quote
             if $(setindex_trait)($(a)) === $(CanSetindex())
                 $(__mul!)($(a), $(b), $(c))
@@ -192,7 +194,7 @@ function __handle_custom_operator(op::Union{Val{:times}, Val{:plustimes}}, M, ex
                 $(a) = $(_restructure)($a, $(b) * ($c))
             end
         end
-    elseif @capture(expr, a_+=×(b_, c_))
+    elseif @capture(expr, a_ += ×(b_, c_))
         return quote
             if $(setindex_trait)($(a)) === $(CanSetindex())
                 $(__mul!)($(a), $(b), $(c), true, true)
@@ -207,7 +209,7 @@ end
 function __handle_dot_op_equals_operators(M, expr, depth)
     op = nothing
     al, bl = nothing, nothing
-    if @capture(expr, a_.=b_)
+    if @capture(expr, a_ .= b_)
         return quote
             if $(setindex_trait)($(a)) === $(CanSetindex())
                 $(a) .= $(b)
@@ -216,10 +218,10 @@ function __handle_dot_op_equals_operators(M, expr, depth)
             end
         end
     end
-    @capture(expr, a_.+=b_) && (op = :.+; al = a; bl = b)
-    @capture(expr, a_.-=b_) && (op = :.-; al = a; bl = b)
-    @capture(expr, a_.*=b_) && (op = :.*; al = a; bl = b)
-    @capture(expr, a_./=b_) && (op = :./; al = a; bl = b)
+    @capture(expr, a_ .+= b_) && (op = :.+; al = a; bl = b)
+    @capture(expr, a_ .-= b_) && (op = :.-; al = a; bl = b)
+    @capture(expr, a_ .*= b_) && (op = :.*; al = a; bl = b)
+    @capture(expr, a_ ./= b_) && (op = :./; al = a; bl = b)
     if op !== nothing
         return quote
             if $(setindex_trait)($(al)) === $(CanSetindex())
@@ -301,8 +303,10 @@ used by `@bangbang` to determine if an array can be setindex-ed or not.
     return y
 end
 
-const OP_MAPPING = Dict{Symbol, Function}(:copyto! => __copyto!!, :.-= => __sub!!,
-    :.+= => __add!!, :.*= => __mul!!, :./= => __div!!, :copy => __copy)
+const OP_MAPPING = Dict{Symbol, Function}(
+    :copyto! => __copyto!!, :.-= => __sub!!,
+    :.+= => __add!!, :.*= => __mul!!, :./= => __div!!, :copy => __copy
+)
 
 @inline @generated function __safe_axpy!(α, x, y)
     hasmethod(axpy!, Tuple{typeof(α), typeof(x), typeof(y)}) || return :(axpy!(α, x, y))
