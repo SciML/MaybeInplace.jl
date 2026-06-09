@@ -19,15 +19,5 @@ concurrency:
 
 jobs:
   tests:
-    name: "Tests"
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - "ubuntu-latest"
-          - "macOS-latest"
-          - "windows-latest"
-    uses: "SciML/.github/.github/workflows/tests.yml@v1"
-    with:
-      os: "${{ matrix.os }}"
+    uses: "SciML/.github/.github/workflows/grouped-tests.yml@v1"
     secrets: "inherit"
