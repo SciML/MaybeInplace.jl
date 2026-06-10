@@ -1,0 +1,11 @@
+[deps]
+Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
+MaybeInplace = "bb5d69b7-63fc-4a16-80bd-7e42200c7bdb"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[sources]
+MaybeInplace = { path = "../.." }
+
+[compat]
+julia = "1.10"
