@@ -1,4 +1,5 @@
 using Pkg
+using SafeTestsets, Test
 
 const GROUP = get(ENV, "GROUP", "All")
 
@@ -8,8 +9,6 @@ if GROUP == "QA"
     Pkg.instantiate()
     include("qa.jl")
 else
-    using SafeTestsets, Test
-
     @testset "MaybeInplace.jl" begin
         if GROUP == "All" || GROUP == "Core"
             @safetestset "Core" begin
