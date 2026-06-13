@@ -1,19 +1,11 @@
-using Pkg
 using SafeTestsets, Test
+using SciMLTesting
 
-const GROUP = get(ENV, "GROUP", "All")
-
-if GROUP == "QA"
-    Pkg.activate(joinpath(@__DIR__, "qa"))
-    Pkg.develop(PackageSpec(; path = joinpath(@__DIR__, "..")))
-    Pkg.instantiate()
-    include(joinpath(@__DIR__, "qa", "qa.jl"))
-else
-    @testset "MaybeInplace.jl" begin
-        if GROUP == "All" || GROUP == "Core"
-            @safetestset "Core" begin
-                include("basictests.jl")
-            end
-        end
-    end
-end
+run_tests(;
+    core = joinpath(@__DIR__, "basictests.jl"),
+    groups = Dict(
+        "QA" => (; env = joinpath(@__DIR__, "qa"), body = () -> begin
+            include(joinpath(@__DIR__, "qa", "qa.jl"))
+        end),
+    ),
+)
