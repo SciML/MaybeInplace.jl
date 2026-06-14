@@ -1,9 +1,11 @@
-using Aqua, JET, MaybeInplace, Test
+using SafeTestsets
 
-@testset "Code quality (Aqua.jl)" begin
+@safetestset "Code quality (Aqua.jl)" begin
+    using Aqua, MaybeInplace
     Aqua.test_all(MaybeInplace; ambiguities = false)
 end
 
-@testset "Code linting (JET.jl)" begin
+@safetestset "Code linting (JET.jl)" begin
+    using JET, MaybeInplace
     JET.test_package(MaybeInplace; target_defined_modules = true)
 end
