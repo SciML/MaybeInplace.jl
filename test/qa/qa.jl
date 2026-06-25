@@ -1,5 +1,4 @@
-using Aqua, JET, MaybeInplace, SciMLTesting, Test
-using ExplicitImports
+using SciMLTesting, JET, MaybeInplace, Test
 # Load SparseArrays so MaybeInplaceSparseArraysExt is active: the ExplicitImports
 # checks recurse into loaded extensions, so the extension's accesses are covered too.
 using SparseArrays
@@ -26,12 +25,8 @@ ei_kwargs = (;
 
 run_qa(
     MaybeInplace;
-    Aqua = Aqua,
-    JET = JET,
-    jet = true,
     jet_kwargs = (; target_defined_modules = true),
     aqua_kwargs = (; ambiguities = false),
-    ExplicitImports = ExplicitImports,
     explicit_imports = true,
     ei_kwargs = ei_kwargs,
 )
