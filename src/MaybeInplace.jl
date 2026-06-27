@@ -341,4 +341,12 @@ end
 ## Exports
 export @bb, @bangbang, @❗
 
+# `__mul!` is the documented overload point for the matmul (`×`) operation: package
+# extensions (e.g. MaybeInplaceSparseArraysExt) and downstream packages specialize it
+# for their array types. Declare it public so those qualified accesses are recognized
+# as accessing intended API rather than an internal name.
+@static if VERSION >= v"1.11"
+    eval(Expr(:public, :__mul!))
+end
+
 end
