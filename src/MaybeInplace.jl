@@ -313,6 +313,44 @@ const OP_MAPPING = Dict{Symbol, Function}(
     return :(@. y += α * x)
 end
 
+"""
+    __mul!(C, A, B)
+    __mul!(C, A, B, α, β)
+
+Mutating multiplication hook used by `@bangbang`/`@bb` when rewriting the custom
+matrix multiplication operator `×`.
+
+`__mul!(C, A, B)` writes `A * B` into `C`. `__mul!(C, A, B, α, β)` writes the
+scaled update `α * A * B + β * C` into `C`, matching the semantics of
+`LinearAlgebra.mul!`.
+
+## Arguments
+
+  - `C`: mutable output storage that receives the multiplication result.
+  - `A`: left multiplication input.
+  - `B`: right multiplication input.
+  - `α`: multiplier applied to `A * B` in the five-argument form.
+  - `β`: multiplier applied to the previous contents of `C` in the five-argument form.
+
+## Extending
+
+Define methods of `MaybeInplace.__mul!` for array-like types that need specialized
+storage-preserving multiplication when used with `@bb y = A × B` or
+`@bb y += A × B`. Implementations should mutate and return `C`.
+
+## Examples
+
+```julia
+using MaybeInplace
+
+C = zeros(2)
+A = [1.0 2.0; 3.0 4.0]
+B = [1.0, 1.0]
+
+MaybeInplace.__mul!(C, A, B)
+C == [3.0, 7.0]
+```
+"""
 __mul!(C, A, B) = mul!(C, A, B)
 __mul!(C, A, B, α, β) = mul!(C, A, B, α, β)
 
@@ -341,10 +379,6 @@ end
 ## Exports
 export @bb, @bangbang, @❗
 
-# `__mul!` is the documented overload point for the matmul (`×`) operation: package
-# extensions (e.g. MaybeInplaceSparseArraysExt) and downstream packages specialize it
-# for their array types. Declare it public so those qualified accesses are recognized
-# as accessing intended API rather than an internal name.
 @static if VERSION >= v"1.11"
     eval(Expr(:public, :__mul!))
 end
