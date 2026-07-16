@@ -1,0 +1,6 @@
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+MaybeInplace = "bb5d69b7-63fc-4a16-80bd-7e42200c7bdb"
+
+[compat]
+Documenter = "1"
