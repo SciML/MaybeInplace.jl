@@ -25,6 +25,7 @@ ei_kwargs = (;
 
 run_qa(
     MaybeInplace;
+    api_docs_kwargs = (; rendered = true),
     jet_kwargs = (; target_defined_modules = true),
     aqua_kwargs = (; ambiguities = false),
     explicit_imports = true,
