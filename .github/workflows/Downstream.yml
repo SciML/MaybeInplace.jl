@@ -12,11 +12,12 @@ jobs:
       fail-fast: false
       matrix:
         package:
-          - {user: SciML, repo: SimpleNonlinearSolve.jl, group: All}
+          - {user: SciML, repo: NonlinearSolve.jl, subdir: lib/SimpleNonlinearSolve, group: All}
           - {user: SciML, repo: NonlinearSolve.jl, group: All}
     uses: "SciML/.github/.github/workflows/downstream.yml@v1"
     with:
       owner: "${{ matrix.package.user }}"
       repo: "${{ matrix.package.repo }}"
+      subdir: "${{ matrix.package.subdir }}"
       group: "${{ matrix.package.group }}"
     secrets: "inherit"
