@@ -5,8 +5,6 @@ makedocs(
     modules = [MaybeInplace],
     sitename = "MaybeInplace.jl",
     checkdocs = :exports,
-    doctest = false,
-    linkcheck = false,
     format = Documenter.HTML(
         canonical = "https://docs.sciml.ai/MaybeInplace/stable/"
     ),

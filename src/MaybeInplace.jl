@@ -4,81 +4,6 @@ using LinearAlgebra: LinearAlgebra, axpy!, mul!
 using MacroTools: MacroTools, @capture
 using ArrayInterface: can_setindex, restructure
 
-## Documentation
-__bangbang__docs = """
-    @bangbang <expr>
-    @bb <expr>
-    @❗ <expr> # ❗ can be typed with \\:exclamation:<tab>
-
-The `@bangbang` macro rewrites expressions to use out-of-place operations if needed. The
-following operations are supported:
-
-  1. `copyto!(y, x)`
-  2. `x .(+/-/*)= <expr>`
-  3. `x ./= <expr>`
-  4. `x = copy(y)`
-  5. `x .= <expr>`
-  6. `@. <expr>`
-  7. `x = copy(y)`
-  8. `axpy!(a, x, y)`
-  9. `x = similar(y)`
-
-This macro also allows some custom operators:
-
-  1. `×` (typed with `\\times<tab>`): This is effectively a matmul operator. It is
-      rewritten to use `mul!` if `y` can be setindex-ed else it is rewritten to use
-      `restructure` to create a new array. If there is a `vec` on the rhs, `vec` is also
-      applied to the lhs. This is useful for handling arbitrary dimensional arrays by
-      flattening them.
-
-!!! warning
-
-    Using this on any operation not in the list will throw an error.
-
-## Example
-
-```julia
-using MaybeInplace, StaticArrays
-
-function my_non_generic_iip_oop(y, x)
-    copyto!(y, x)
-    return y
-end
-
-my_non_generic_iip_oop([0.0, 0.0], [1.0, 1.0]) # Works
-my_non_generic_iip_oop(@SVector[0.0, 0.0], @SVector[1.0, 1.0]) # Fails
-```
-
-Typically this will fail if `y` cannot be setindex-ed. However, this macro will rewrite
-the expression to use `copyto!` if the array supports `setindex!` (via `ArrayInterface.jl`)
-else it will use `y = x`.
-
-```julia
-function my_generic_iip_oop(y, x)
-    @bb copyto!(y, x)
-    return y
-end
-
-my_generic_iip_oop([0.0, 0.0], [1.0, 1.0]) # Works
-my_generic_iip_oop(@SVector[0.0, 0.0], @SVector[1.0, 1.0]) # Also Works
-```
-
-Importantly note that this doesn't respect the semantics of `copyto!`, rather it respects
-only if the array is mutable, else it just assigns it to the variable. This is true for
-all operations on the list.
-
-!!! tip
-
-    For extensive use of this Package, see the source code for `NonlinearSolve.jl` and
-    `SimpleNonlinearSolve.jl`
-
-!!! warning
-
-    The generated code heavily relies on the julia compiler constant propating and
-    eliminating branches. Using with tools like `Zygote.jl` might lead to slowdowns.
-    In those cases, one should anyways use non-mutating code.
-"""
-
 ## Main Function
 function __bangbang__(M, iip::Symbol, expr)
     new_expr = nothing
@@ -332,11 +257,17 @@ scaled update `α * A * B + β * C` into `C`, matching the semantics of
   - `α`: multiplier applied to `A * B` in the five-argument form.
   - `β`: multiplier applied to the previous contents of `C` in the five-argument form.
 
-## Extending
+## Interface
 
-Define methods of `MaybeInplace.__mul!` for array-like types that need specialized
-storage-preserving multiplication when used with `@bb y = A × B` or
-`@bb y += A × B`. Implementations should mutate and return `C`.
+`__mul!` is a developer extension point, not a general user-facing multiplication API.
+Extend `MaybeInplace.__mul!` only when a destination type needs a specialized
+storage-preserving implementation for `@bb y = A × B` or `@bb y += A × B`.
+
+Implementations must mutate and return `C`. The three-argument form must overwrite `C`
+with `A * B`; the five-argument form must overwrite `C` with `α * A * B + β * C`, using
+the value of `C` that existed on entry. Methods must preserve the destination's shape and
+storage invariants, or return a result that `MaybeInplace` can restructure to that shape.
+Do not call this hook directly from ordinary application code; use the `@bangbang` macro.
 
 ## Examples
 
@@ -355,18 +286,111 @@ __mul!(C, A, B) = mul!(C, A, B)
 __mul!(C, A, B, α, β) = mul!(C, A, B, α, β)
 
 ## Macros
-for m in (:bangbang, :bb, :❗)
-    @eval begin
-        @doc __bangbang__docs
-        macro $m(expr)
-            return __bangbang__(__module__, expr)
-        end
+"""
+    @bangbang expr
+    @bangbang iip expr
 
-        @doc __bangbang__docs
-        macro $m(iip::Symbol, expr)
-            return __bangbang__(__module__, iip, expr)
-        end
-    end
+Rewrite a supported mutating expression so that it updates mutable destinations and
+rebinds immutable destinations to an equivalent out-of-place result.
+
+# Arguments
+
+  - `expr`: one supported operation: `copyto!(y, x)`, `axpy!(a, x, y)`, `y .= x`,
+    `y .+= x`, `y .-= x`, `y .*= x`, `y ./= x`, `y = copy(x)`, `y = zero(x)`,
+    `y = similar(x)`, `@. y = f`, `y = A × B`, or `y += A × B`.
+  - `iip`: an identifier bound to a `Bool`. When it is `true`, the supplied function call
+    is evaluated as written; when it is `false`, its first argument is rebound to the
+    corresponding out-of-place result. This form applies only to ordinary function calls.
+
+The macro uses the destination's setindex trait to select its branch. For immutable
+destinations, it preserves the value semantics of the listed operations, not the exact
+mutating-call contract. Unsupported syntax raises an error during macro expansion.
+
+# Examples
+
+```julia
+using MaybeInplace
+
+function add_one(y)
+    @bangbang y .+= 1
+    return y
+end
+
+add_one([1, 2])
+```
+"""
+macro bangbang(expr)
+    return __bangbang__(__module__, expr)
+end
+
+macro bangbang(iip::Symbol, expr)
+    return __bangbang__(__module__, iip, expr)
+end
+
+"""
+    @bb expr
+    @bb iip expr
+
+Alias for [`@bangbang`](@ref). Use `@bb` when a compact spelling makes a sequence of
+generic in-place/out-of-place operations easier to read.
+
+# Arguments
+
+  - `expr`: a supported `@bangbang` expression.
+  - `iip`: an identifier bound to a `Bool` for the conditional function-call form.
+
+# Examples
+
+```julia
+using MaybeInplace
+
+function copy_value(y, x)
+    @bb copyto!(y, x)
+    return y
+end
+
+copy_value([0.0, 0.0], [1.0, 2.0])
+```
+"""
+macro bb(expr)
+    return __bangbang__(__module__, expr)
+end
+
+macro bb(iip::Symbol, expr)
+    return __bangbang__(__module__, iip, expr)
+end
+
+"""
+    @❗ expr
+    @❗ iip expr
+
+Alias for [`@bangbang`](@ref), named with an exclamation mark to emphasize code that can
+mutate its destination. Type the macro name with `\\:exclamation:<tab>` in the Julia REPL.
+
+# Arguments
+
+  - `expr`: a supported `@bangbang` expression.
+  - `iip`: an identifier bound to a `Bool` for the conditional function-call form.
+
+# Examples
+
+```julia
+using MaybeInplace
+
+function scale_value(y)
+    @❗ y .*= 2
+    return y
+end
+
+scale_value([1, 2])
+```
+"""
+macro ❗(expr)
+    return __bangbang__(__module__, expr)
+end
+
+macro ❗(iip::Symbol, expr)
+    return __bangbang__(__module__, iip, expr)
 end
 
 @inline _vec(v) = v
