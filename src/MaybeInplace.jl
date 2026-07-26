@@ -234,8 +234,11 @@ const OP_MAPPING = Dict{Symbol, Function}(
 )
 
 @inline @generated function __safe_axpy!(α, x, y)
-    hasmethod(axpy!, Tuple{typeof(α), typeof(x), typeof(y)}) || return :(axpy!(α, x, y))
-    return :(@. y += α * x)
+    # In a `@generated` body the arguments are the argument *types*, so the method lookup
+    # uses them directly; `typeof` would ask whether `axpy!` accepts three `DataType`s,
+    # which is never true, leaving the fallback unreachable.
+    hasmethod(axpy!, Tuple{α, x, y}) || return :(@. y += α * x)
+    return :(axpy!(α, x, y))
 end
 
 """
