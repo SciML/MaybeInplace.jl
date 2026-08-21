@@ -410,4 +410,18 @@ export @bb, @bangbang, @❗
     eval(Expr(:public, :__mul!))
 end
 
+using PrecompileTools: @compile_workload, @setup_workload
+
+@setup_workload begin
+    @compile_workload begin
+        x = [1.0, 2.0]
+        y = similar(x)
+        @bb copyto!(y, x)
+        @bb y .+= x
+        @bb y .*= 2
+        setindex_trait(y)
+        setindex_trait(1.0)
+    end
+end
+
 end
