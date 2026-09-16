@@ -7,6 +7,9 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
+Pkg = "< 0.0.1, 1"
 SafeTestsets = "0.1, 1"
 SciMLTesting = "2.4"
+SparseArrays = "< 0.0.1, 1"
 StaticArrays = "1.9.18"
+Test = "< 0.0.1, 1"
